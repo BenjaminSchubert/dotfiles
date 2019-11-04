@@ -127,12 +127,6 @@ if ls --color >/dev/null 2>/dev/null; then
     alias ls="ls --color --ignore=lost+found"
 fi
 
-if [ -e /usr/share/terminfo/x/xterm-256color ]; then
-    export TERM='xterm-256color'
-else
-    export TERM='xterm-color'
-fi
-
 if [ -f /usr/share/bash-completion/bash_completion ]; then
     . /usr/share/bash-completion/bash_completion
 fi
