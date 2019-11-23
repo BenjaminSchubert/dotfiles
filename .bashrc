@@ -21,6 +21,31 @@ WHITE="\\[\\e[97m\\]"
 
 
 ####################
+##   UTILITIES    ##
+####################
+
+_timeout() {
+    (
+        set +b;
+
+        "${@:2}" &
+        pid=$!
+
+        (sleep "$1" && kill -9 $pid) &
+        watcher=$!
+
+        wait $pid 2>/dev/null
+        retcode=$?
+
+        if [ $retcode -eq 0 ]; then
+            kill -9 $watcher
+        fi
+
+        exit $retcode
+    )
+}
+
+####################
 ## PROMPT COMMAND ##
 ####################
 
@@ -49,17 +74,20 @@ __git_status() {
         fi
     }
 
-    changed_files="$(git status --porcelain)"
-    local changes=""
-    # staged
-    changes+=$(__modified "${changed_files}" '^A' "${GREEN}" +)
-    # untracked
-    changes+=$(__modified "${changed_files}" '^??' "${YELLOW}" -)
-    # changed but unstaged
-    changes+=$(__modified "${changed_files}" '^.M' "${RED}" \*)
+    if ! changed_files="$(_timeout 0.1 git status --porcelain)"; then
+        status+="${BLUE}[${RED}???${BLUE}]"
+    else
+        local changes=""
+        # staged
+        changes+=$(__modified "${changed_files}" '^A' "${GREEN}" +)
+        # untracked
+        changes+=$(__modified "${changed_files}" '^??' "${YELLOW}" -)
+        # changed but unstaged
+        changes+=$(__modified "${changed_files}" '^.M' "${RED}" \*)
 
-    if [ ${#changes} -ne 0 ]; then
-        status+="${BLUE}[${changes%?}${BLUE}]"
+        if [ ${#changes} -ne 0 ]; then
+            status+="${BLUE}[${changes%?}${BLUE}]"
+        fi
     fi
 
     echo "${status}"
