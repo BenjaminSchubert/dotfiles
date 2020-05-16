@@ -58,10 +58,10 @@ __memory() {
     local status=""
 
     free_status=$(free)
-    used_memory=$(awk '/Mem/{printf("%.d"), $3/$2*100}' <<< "${free_status}")
-    used_swap=$(awk '/Swap/{printf("%.d"), $3/$2*100}' <<< "${free_status}")
+    used_memory=$(awk '/Mem/{printf "%.f", $3/$2*100}' <<< "${free_status}")
+    used_swap=$(awk '/Swap/{printf "%.f", $3/$2*100}' <<< "${free_status}")
 
-    if [ ! "${used_swap}" ]; then
+    if [ "${used_swap}" == "-nan" ]; then
         used_swap=0
     fi
 
