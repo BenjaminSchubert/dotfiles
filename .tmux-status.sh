@@ -1,33 +1,31 @@
 #!/usr/bin/env bash
 
-BG1="colour232"
-BG2="colour235"
-BG3="colour238"
-BG4="colour241"
-BG5="colour244"
+RED="#[fg=red]"
+WHITE="#[fg=white]"
+GREEN="#[fg=green]"
+BLUE="#[fg=blue]"
 
-BAD="colour196"
-NEUTRAL="colour231"
-GOOD="colour76"
-
+SEP="${BLUE} | "
 
 __batteries() {
     local batteries
-    local battery_status=" "
+    local battery_status=""
 
     batteries=$(upower -e | grep 'BAT')
 
     for battery in ${batteries}; do
-        if [ "$(upower -i "${battery}" | grep -E "state" | tr -s " " | cut -d " " -f 3)" == "charging" ]; then
-            battery_status+="#[fg=${GOOD}]"
+        status=$(upower -i "${battery}" | grep -E "state" | tr -s " " | cut -d " " -f 3)
+
+        if [ "${status}" == "charging" ] || [ "${status}" == "fully-charged" ]; then
+            battery_status+="${GREEN}"
         else
-            battery_status+="#[fg=${BAD}]"
+            battery_status+="${RED}"
         fi
         battery_status+=$(upower -i "${battery}" | grep -E "percentage" | tr -s " " | cut -d " " -f 3)
         battery_status+=" "
     done
 
-    echo "${battery_status}"
+    echo "${battery_status::-1}"
 }
 
 
@@ -42,14 +40,14 @@ __cpu() {
     cpu_5m=${cpu_5m%.*}
 
     if [[ ${cpu_5m} -ge ${total_cpus} ]]; then
-        local COLOR=${BAD}
+        local COLOR=${RED}
     elif [ "${cpu_5m}" -ge $((total_cpus / 2)) ]; then
-        local COLOR=${NEUTRAL}
+        local COLOR=${WHITE}
     else
-        local COLOR=${GOOD}
+        local COLOR=${GREEN}
     fi
 
-    echo "#[fg=${COLOR}] ${cpu_info} "
+    echo "${COLOR}${cpu_info}"
 }
 
 
@@ -69,27 +67,25 @@ __memory() {
 
     for entry in ${used_memory} ${used_swap}; do
         if [[ ${entry} -ge 75 ]]; then
-            local COLOR=${BAD}
+            local COLOR=${RED}
         elif [[ ${entry} -ge 25 ]]; then
-            local COLOR=${NEUTRAL}
+            local COLOR=${WHITE}
         else
-            local COLOR=${GOOD}
+            local COLOR=${GREEN}
         fi
 
-        status+="#[fg=${COLOR}] ${entry}%"
+        status+="${COLOR}${entry}% "
     done
 
-    echo "${status} "
+    echo "${status::-1}"
 }
 
 
-hour_status="#[fg=${NEUTRAL}] $(date +%k:%M)"
-date_status="#[fg=${NEUTRAL}] $(date +%d/%m/%y) "
+datetime_status="$(date +%d/%m/%y-%k:%M)"
 
-status="#[fg=${BG5}]#[bg=${BG5}]$(__cpu)"
-status+="#[fg=${BG4}]#[bg=${BG4}]$(__memory)"
-status+="#[fg=${BG3}]#[bg=${BG3}]$(__batteries)"
-status+="#[fg=${BG2}]#[bg=${BG2}]${date_status}"
-status+="#[fg=${BG1}]#[bg=${BG1}]${hour_status}"
+status="${BLUE}L:$(__cpu)${SEP}"
+status+="M:$(__memory)${SEP}"
+status+="B:$(__batteries)${SEP}"
+status+="${WHITE}${datetime_status}"
 echo "${status}"
 
