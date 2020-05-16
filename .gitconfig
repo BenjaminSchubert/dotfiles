@@ -13,7 +13,3 @@ cleanup = "!git fetch --prune && git branch -vv | awk '/: gone]/{print $1}' | xa
 
 [gpg]
 program = gpg2
-
-[core]
-excludesfile = ~/.gitignore_global
-
