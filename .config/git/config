@@ -1,0 +1,10 @@
+[alias]
+lg = log --graph --abbrev-commit --decorate --date=relative --format=format:'%C(bold blue)%h%C(reset) - %C(bold green)(%ar)%C(reset) %C(white)%s%C(reset) %C(dim white)- %an%C(reset)%C(bold yellow)%d%C(reset)' --all
+cleanup = "!git fetch --prune && git branch -vv | awk '/: gone]/{print $1}' | xargs --no-run-if-empty git branch --delete"
+cl = "clean --exclude .vscode/"
+
+[color]
+ui = on
+
+[push]
+default = simple
