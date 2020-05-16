@@ -81,11 +81,13 @@ __memory() {
 }
 
 
-datetime_status="$(date +%d/%m/%y-%k:%M)"
-
 status="${BLUE}L:$(__cpu)${SEP}"
 status+="M:$(__memory)${SEP}"
-status+="B:$(__batteries)${SEP}"
-status+="${WHITE}${datetime_status}"
+
+if batteries=$(__batteries); then
+    status+="B:$(__batteries)${SEP}"
+fi
+
+status+="${WHITE}$(date +%d/%m/%y-%k:%M)"
 echo "${status}"
 
