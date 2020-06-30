@@ -31,14 +31,14 @@ _timeout() {
         "${@:2}" &
         pid=$!
 
-        (sleep "$1" && kill -9 $pid) &
+        (sleep "$1" && kill -15 $pid) &
         watcher=$!
 
         wait $pid 2>/dev/null
         retcode=$?
 
         if [ $retcode -eq 0 ]; then
-            kill -9 $watcher
+            kill -15 $watcher
         fi
 
         exit $retcode
