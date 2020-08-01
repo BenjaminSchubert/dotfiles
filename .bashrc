@@ -135,11 +135,6 @@ __prompt_command() {
 
 export PROMPT_COMMAND=__prompt_command
 
-export SSH_AUTH_SOCK="${XDG_RUNTIME_DIR}/gnupg/S.gpg-agent.ssh"
-
-export GPG_TTY=$(tty)
-gpg-connect-agent updatestartuptty /bye >/dev/null
-
 export EDITOR="/usr/bin/vim"
 export VISUAL="/usr/bin/vim"
 
