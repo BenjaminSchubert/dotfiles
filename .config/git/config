@@ -8,3 +8,6 @@ ui = on
 
 [push]
 default = simple
+
+[pull]
+ff = only
