@@ -1,6 +1,6 @@
 #!/bin/sh
 
-CWD=$(realpath $(dirname "$0"))
+CWD="$(realpath $(dirname "$0"))"
 
 mkdir -p ~/.config/git
 
