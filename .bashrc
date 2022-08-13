@@ -5,6 +5,8 @@ if [[ $- != *i* ]]; then
 fi
 
 if [ -f /etc/bashrc ]; then
+    # don't follow source when validating with shellcheck
+    # shellcheck disable=SC1091
     . /etc/bashrc
 fi
 
@@ -44,6 +46,90 @@ _timeout() {
         exit $retcode
     )
 }
+
+_log_info() {
+    echo -e "\e[34m${1}\e[0m"
+}
+
+_log_error() {
+    echo -e "\e[31m${1}\e[0m"
+}
+
+
+##############
+## Commands ##
+##############
+export PROJECTS_HOME="${HOME}/projects"
+gg() {
+    if [ "${#}" -ge 2 ]; then
+        _log_error "Only support 0 argument if in the right directory, or 1 to precise a path."
+        return 1
+    fi
+
+    local clone_uri="${1}"
+
+    # Based on https://www.rfc-editor.org/rfc/rfc3986#appendix-B, but remove
+    # non supported groups
+
+    # group 1, the protocol with :, e.g. https: or git+ssh:
+    local uri_protocol="([^:/?#]+:)"
+    # group 2, the hostname starting with //, and containing the port
+    # group 3, the hostname
+    local uri_hostinfo="(//([^/?#]*))"
+    # group 4, the path
+    local uri_path="([^?#]*)"
+    local re_uri="^${uri_protocol}?${uri_hostinfo}?${uri_path}"
+    if ! [[ "$1" =~ $re_uri ]]; then
+        _log_error "Unable to parse url"
+        return 1
+    fi
+
+    local hostname="${BASH_REMATCH[3]}"
+    local path="${BASH_REMATCH[4]}"
+
+    if [ "${hostname}" == "" ]; then
+        case "${PWD}" in
+            "${PROJECTS_HOME}"/*)
+                hostname="${PWD#"${PROJECTS_HOME}/"}"
+                clone_uri="https://${hostname}/${path}"
+            ;;
+            *)
+                _log_error "No hostname detected in ${clone_uri} and not in a subdirectory of ${PROJECTS_HOME}"
+                return 1
+            ;;
+        esac
+    fi
+
+    local dest_path="${PROJECTS_HOME}/${hostname}/${path}"
+    if [ -e "${dest_path}" ]; then
+        if [ ! -d "${dest_path}" ]; then
+            _log_error "Cannot clone ${clone_uri} to ${dest_path}, destination exists and is not a directory."
+            return 1
+        fi
+
+        if [ -e "${dest_path}/.git" ]; then
+            _log_error "Cannot clonse ${clone_uri} to ${dest_path}, destination is already a git repository."
+            return 1
+        fi
+
+        _log_info "Directory ${dest_path} already exists. Initializing origin remote to ${clone_uri}"
+        # We don't want to handle pushd errors
+        # shellcheck disable=SC2164
+        git -C "${dest_path}" init && \
+            git -C "${dest_path}" remote add origin "${clone_uri}" && \
+            git -C "${dest_path}" fetch && \
+            pushd "${dest_path}" > /dev/null
+        return $?
+    fi
+
+    _log_info "Will clone ${clone_uri} to ${dest_path}"
+    # We don't want to handle pushd errors
+    # shellcheck disable=SC2164
+    git clone "${clone_uri}" "${dest_path}" && \
+        pushd "${dest_path}" > /dev/null
+    return $?
+}
+
 
 ####################
 ## PROMPT COMMAND ##
@@ -154,10 +240,14 @@ if ls --color >/dev/null 2>/dev/null; then
 fi
 
 if [ -f /usr/share/bash-completion/bash_completion ]; then
+    # don't follow source when validating with shellcheck
+    # shellcheck disable=SC1091
     . /usr/share/bash-completion/bash_completion
 fi
 
 if [ -f ~/.bashrc.local ]; then
+    # don't follow source when validating with shellcheck
+    # shellcheck disable=SC1090
     . ~/.bashrc.local
 fi
 
@@ -168,5 +258,7 @@ fi
 
 if [ -f /usr/share/virtualenvwrapper/virtualenvwrapper_lazy.sh ]; then
     export WORKON_HOME=~/.virtualenvs/
+    # don't follow source when validating with shellcheck
+    # shellcheck disable=SC1091
     . /usr/share/virtualenvwrapper/virtualenvwrapper_lazy.sh
 fi
