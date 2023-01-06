@@ -130,6 +130,7 @@ gg() {
     return $?
 }
 
+alias git-root="cd \$(git rev-parse --show-toplevel)"
 
 ####################
 ## PROMPT COMMAND ##
