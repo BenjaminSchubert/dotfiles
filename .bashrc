@@ -10,16 +10,25 @@ if [ -f /etc/bashrc ]; then
     . /etc/bashrc
 fi
 
+# ASCII color codes in use here
+RESET="\\e[0m"
+BOLD="\\e[1m"
+RED="\\e[31m"
+GREEN="\\e[32m"
+YELLOW="\\e[33m"
+BLUE="\\e[34m"
+MAGENTA="\\e[35m"
+WHITE="\\e[97m"
 
-RESET="\\[\\e[0m\\]"
-BOLD="\\[\\e[1m\\]"
-
-RED="\\[\\e[31m\\]"
-GREEN="\\[\\e[32m\\]"
-YELLOW="\\[\\e[33m\\]"
-BLUE="\\[\\e[34m\\]"
-MAGENTA="\\[\\e[35m\\]"
-WHITE="\\[\\e[97m\\]"
+# Same colors but wrapped for use in the bash prompt
+B_RESET="\\[${RESET}\\]"
+B_BOLD="\\[${BOLD}\\]"
+B_RED="\\[${RED}\\]"
+B_GREEN="\\[${GREEN}\\]"
+B_YELLOW="\\[${YELLOW}\\]"
+B_BLUE="\\[${BLUE}\\]"
+B_MAGENTA="\\[${MAGENTA}\\]"
+B_WHITE="\\[${WHITE}\\]"
 
 
 ####################
@@ -48,11 +57,11 @@ _timeout() {
 }
 
 _log_info() {
-    echo -e "\e[34m${1}\e[0m"
+    echo -e "${BLUE}${1}${RESET}"
 }
 
 _log_error() {
-    echo -e "\e[31m${1}\e[0m"
+    echo -e "${RED}${1}${RESET}"
 }
 
 
@@ -139,41 +148,41 @@ alias git-root="cd \$(git rev-parse --show-toplevel)"
 __git_status() {
     local status
 
-    status="${YELLOW}$(basename "$(git rev-parse --show-toplevel)")${BLUE}@"
+    status="${B_YELLOW}$(basename "$(git rev-parse --show-toplevel)")${B_BLUE}@"
 
     if ! branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)"; then
-        status+="${RED}INVALID"
+        status+="${B_RED}INVALID"
     else
-        status+="${YELLOW}${branch}"
+        status+="${B_YELLOW}${branch}"
     fi
 
     git_path=$(git rev-parse --absolute-git-dir)
     if [ -d "${git_path}/rebase-apply" ]; then
-        status+="${BLUE}(${RED}REBASING${BLUE})"
+        status+="${B_BLUE}(${B_RED}REBASING${B_BLUE})"
     elif [ -f "${git_path}/MERGE_HEAD" ]; then
-        status+="${BLUE}(${RED}MERGING${BLUE})"
+        status+="${B_BLUE}(${B_RED}MERGING${B_BLUE})"
     fi
 
     __modified() {
         changed=$(grep -c "${2}" <<< "${1}" | sed "s/[ \\t]*//g")
         if [ "${changed}" -ne 0 ]; then
-            echo "$3$4$changed${BLUE};"
+            echo "$3$4$changed${B_BLUE};"
         fi
     }
 
     if ! changed_files="$(_timeout 0.1 git status --porcelain)"; then
-        status+="${BLUE}[${RED}???${BLUE}]"
+        status+="${B_BLUE}[${B_RED}???${B_BLUE}]"
     else
         local changes=""
         # staged
-        changes+=$(__modified "${changed_files}" '^A' "${GREEN}" +)
+        changes+=$(__modified "${changed_files}" '^A' "${B_GREEN}" +)
         # untracked
-        changes+=$(__modified "${changed_files}" '^??' "${YELLOW}" -)
+        changes+=$(__modified "${changed_files}" '^??' "${B_YELLOW}" -)
         # changed but unstaged
-        changes+=$(__modified "${changed_files}" '^.M' "${RED}" \*)
+        changes+=$(__modified "${changed_files}" '^.M' "${B_RED}" \*)
 
         if [ ${#changes} -ne 0 ]; then
-            status+="${BLUE}[${changes%?}${BLUE}]"
+            status+="${B_BLUE}[${changes%?}${B_BLUE}]"
         fi
     fi
 
@@ -183,14 +192,14 @@ __git_status() {
 
 __retcode_status() {
     # Set last command return code
-    local last_successful=${BLUE}
+    local last_successful=${B_BLUE}
 
     for code in "${@}"; do
         if [ "${code}" -ne 0 ]; then
-            return_status+="${RED}"
-            last_successful="${RED}"
+            return_status+="${B_RED}"
+            last_successful="${B_RED}"
         else
-            return_status+="${BLUE}"
+            return_status+="${B_BLUE}"
         fi
         return_status+="${code} "
     done
@@ -201,7 +210,7 @@ __retcode_status() {
 
 __venv_status() {
     if [ "${VIRTUAL_ENV}" ]; then
-        echo "${BOLD}${MAGENTA}($(basename "${VIRTUAL_ENV}"))${RESET} "
+        echo "${B_BOLD}${B_MAGENTA}($(basename "${VIRTUAL_ENV}"))${B_RESET} "
     fi
 }
 
@@ -213,10 +222,10 @@ __prompt_command() {
 
     # Set git status
     if git rev-parse --is-inside-work-tree >/dev/null 2>/dev/null; then
-        git_status="$(__git_status)${BLUE}:"
+        git_status="$(__git_status)${B_BLUE}:"
     fi
 
-    PS1="$(__venv_status)${BOLD}${GREEN}\\u${BLUE}@${GREEN}\\h${BLUE}:${git_status} ${WHITE}\\W $(__retcode_status "${RETURN_CODES[@]}") ${BLUE}\$${RESET} "
+    PS1="$(__venv_status)${B_BOLD}${B_GREEN}\\u${B_BLUE}@${B_GREEN}\\h${B_BLUE}:${git_status} ${B_WHITE}\\W $(__retcode_status "${RETURN_CODES[@]}") ${B_BLUE}\$${B_RESET} "
 }
 
 
