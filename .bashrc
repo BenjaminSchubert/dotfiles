@@ -418,6 +418,7 @@ __git_status() {
 __retcode_status() {
     # Set last command return code
     local last_successful=${B_BLUE}
+    local return_status=""
 
     for code in "${@}"; do
         if [ "${code}" -ne 0 ]; then
@@ -489,4 +490,8 @@ if [ -f /usr/share/virtualenvwrapper/virtualenvwrapper_lazy.sh ]; then
     # don't follow source when validating with shellcheck
     # shellcheck disable=SC1091
     . /usr/share/virtualenvwrapper/virtualenvwrapper_lazy.sh
+else
+    # This is necessary to ensure the return code of the source is not 0
+    # and thus don't show 1 as startup
+    :
 fi
