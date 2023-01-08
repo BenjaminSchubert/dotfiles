@@ -57,11 +57,11 @@ _timeout() {
 }
 
 _log_info() {
-    echo -e "${BLUE}${1}${RESET}"
+    echo -e "${BLUE}${1}${RESET}" >&2
 }
 
 _log_error() {
-    echo -e "${RED}${1}${RESET}"
+    echo -e "${RED}${1}${RESET}" >&2
 }
 
 
@@ -69,6 +69,8 @@ _log_error() {
 ## Commands ##
 ##############
 export PROJECTS_HOME="${HOME}/projects"
+
+# Clone a git repository following a set structure
 gg() {
     if [ "${#}" -ge 2 ]; then
         _log_error "Only support 0 argument if in the right directory, or 1 to precise a path."
@@ -139,7 +141,230 @@ gg() {
     return $?
 }
 
+
+# Show some information about the specified git repository
+_git_info() {
+    print_status_if_not_empty() {
+        local header="${1}"
+        shift
+        local entries=( "$@" )
+
+        if [ ${#entries[@]} -ne 0 ]; then
+            echo "${header}"
+            for entry in "${entries[@]}"; do
+                echo -e "\t${entry}"
+            done
+        fi
+    }
+
+    local retcode
+    local cwd
+
+    if [ "$#" -gt 1 ]; then
+        echo "Illegal number of parameters: only accept 1 positional argument being the directory" >&2
+        return 1
+    fi
+
+    if [ "$#" -eq 1 ]; then
+        cwd=$(realpath "${1}")
+        retcode=$?
+        if [ ${retcode} -ne 0 ]; then
+            echo "Unable to resolve directory: ${1}"
+            return ${retcode}
+        fi
+    else
+        cwd="${PWD}"
+    fi
+
+    local branches_info
+    branches_info=$(git -C "${cwd}" branch --format '%(refname:short) %(upstream:short) %(upstream:track)')
+    retcode=$?
+    if [ ${retcode} -ne 0 ]; then
+        return ${retcode}
+    fi
+
+    local branches_without_remotes=()
+    local branches_with_remotes_gone=()
+    local branches_unsynced=()
+
+    IFS='
+'
+    for branch_info in ${branches_info}; do
+        local branch=${branch_info%% *}
+        local remote_and_status=${branch_info#"${branch} "}
+        local remote=${remote_and_status%% *}
+        local status=${remote_and_status#"${remote} "}
+
+        if [ -z "${remote}" ]; then
+            branches_without_remotes+=( "${branch}" )
+            continue
+        fi
+
+        if [ -z "${status}" ]; then
+            # This one is up to date, nothing to report
+            continue
+        fi
+
+        if [ "${status}" == "[gone]" ]; then
+            branches_with_remotes_gone+=( "${branch}")
+            continue
+        fi
+
+        local status_regex='\[(ahead ([0-9]+)(, behind ([0-9]+))?)|(behind ([0-9]+))\]'
+        local branch_status="${branch}"
+        if [[ "${status}" =~ ${status_regex} ]]; then
+            if [ -n "${BASH_REMATCH[2]}" ]; then
+                branch_status+=" ${BOLD}${YELLOW}⇑${BASH_REMATCH[2]}${RESET}"
+            fi
+            if [ -n "${BASH_REMATCH[4]}" ]; then
+                branch_status+=" ${BOLD}${MAGENTA}⇓${BASH_REMATCH[4]}${RESET}"
+            fi
+            if [ -n "${BASH_REMATCH[6]}" ]; then
+                branch_status+=" ${BOLD}${MAGENTA}⇓${BASH_REMATCH[6]}${RESET}"
+            fi
+
+            branches_unsynced+=( "${branch_status}" )
+        else
+            echo "Could not extract information from git track info"
+            return 1
+        fi
+    done
+
+    local status
+    status=$(git -C "${cwd}" status --porcelain | awk  '{a[$1]=a[$1]?a[$1]" "$2:$2;} {c[$1]=c[$1]?c[$1]+1:1;} END{for (i in a)print i, c[i], a[i];}')
+    retcode=$?
+    if [ ${retcode} -ne 0 ]; then
+        echo "Error getting git status"
+        return ${retcode}
+    fi
+
+    local unclean_files=()
+
+    IFS='
+'
+    for entry in ${status}; do
+        local type=${entry%% *}
+        local count_and_files=${entry#* }
+        local count=${count_and_files%% *}
+        local files=${count_and_files#* }
+        local color=${RED}
+        local message
+
+        case $type in
+            A)
+                message="added"
+                ;;
+            D)
+                color=${YELLOW}
+                message="deleted"
+                ;;
+            M)
+                message="modified"
+                ;;
+            R)
+                color=${YELLOW}
+                message="renamed"
+                ;;
+            U)
+                message="updated but unmerged"
+                ;;
+            ??)
+                color=${YELLOW}
+                message="untracked"
+                ;;
+            *)
+                echo -e "${YELLOW}Unknown git porcelain status in ${cwd}: ${type}${RESET}" >&2
+                continue
+                ;;
+        esac
+
+        unclean_files+=( "${BOLD}${color}${count}${RESET} ${message} files: ${files}")
+    done
+
+    print_status_if_not_empty "The following branches do not have a remote:" "${branches_without_remotes[@]}"
+    print_status_if_not_empty "The following branches' remotes don't exist anymore:" "${branches_with_remotes_gone[@]}"
+    print_status_if_not_empty "The following branches differ from their remote:" "${branches_unsynced[@]}"
+    print_status_if_not_empty "The following changes are not tracked:" "${unclean_files[@]}"
+}
+
+# Show information about all git repositories under ${PROJECT_HOME}
+_git_info_all() {
+    local retcode
+    local projects
+    local do_update=0
+
+    if [ "$#" -gt 1 ]; then
+        _log_error "Illegal number of parameters: only accept 1 argument: --update"
+        return 1
+    elif [ "$#" -eq 1 ]; then
+        if [ "${1}" != "--update" ]; then
+            _log_error "Unknown parameter '${1}'. Only supports --update."
+            return 1
+        fi
+        do_update=1
+    fi
+
+    projects=$(find "${PROJECTS_HOME}" -name .git -exec dirname {} ';')
+    retcode=$?
+    if [ ${retcode} -ne 0 ]; then
+        echo "Unable to list projects: ${projects}" >&2
+        return ${retcode}
+    fi
+
+    local had_error=0
+
+    IFS='
+'
+
+    if [ ${do_update} -eq 1 ]; then
+        local status
+
+        for project in ${projects}; do
+            status=$(git -C "${project}" fetch --prune 2>&1)
+            retcode=$?
+            if [ ${retcode} -ne 0 ]; then
+                _log_error "error fetching project: ${project}\n${RESET}${status}"
+                had_error=${retcode}
+            else
+                _log_info "Updated ${project}"
+            fi
+        done
+    fi
+
+    for project in ${projects}; do
+        local status
+        status=$(_git_info "${project}")
+        retcode=$?
+
+        if [ ${retcode} -ne 0 ]; then
+            had_error=${retcode}
+            _log_error "${BOLD}${project}: could not get status${RESET}:\n${status}"
+            continue
+        fi
+
+        if [ -z "${status}" ]; then
+            echo -e "${GREEN}✓ ${project}${GREEN}"
+        else
+            echo -e "${BOLD}${RED}X${RESET} ${RED}${project}${RESET}\n${status}"
+        fi
+    done
+
+    return ${had_error}
+}
+
+
+# And some aliases
 alias git-root="cd \$(git rev-parse --show-toplevel)"
+alias git-info="_git_info"
+alias git-info-all="_git_info_all"
+
+alias clip="xclip -sel clip <"
+alias grep="grep --color=auto --exclude-dir={.bzr,.cvs,.hg,.git,.svn}"
+
+if ls --color >/dev/null 2>/dev/null; then
+    alias ls="ls --color --ignore=lost+found"
+fi
+
 
 ####################
 ## PROMPT COMMAND ##
@@ -241,13 +466,6 @@ export SUDO_PATH="/usr/sbin:/sbin"
 export LS_COLORS='rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=01;05;37;41:mi=01;05;37;41:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arj=01;31:*.taz=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.zip=01;31:*.z=01;31:*.Z=01;31:*.dz=01;31:*.gz=01;31:*.lz=01;31:*.xz=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.jpg=01;35:*.jpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.axv=01;35:*.anx=01;35:*.ogv=01;35:*.ogx=01;35:*.pdf=00;32:*.ps=00;32:*.txt=00;32:*.patch=00;32:*.diff=00;32:*.log=00;32:*.tex=00;32:*.doc=00;32:*.aac=00;36:*.au=00;36:*.flac=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.axa=00;36:*.oga=00;36:*.spx=00;36:*.xspf=00;36:'
 
 export HISTCONTROL="erasedups"
-
-alias clip="xclip -sel clip <"
-alias grep="grep --color=auto --exclude-dir={.bzr,.cvs,.hg,.git,.svn}"
-
-if ls --color >/dev/null 2>/dev/null; then
-    alias ls="ls --color --ignore=lost+found"
-fi
 
 if [ -f /usr/share/bash-completion/bash_completion ]; then
     # don't follow source when validating with shellcheck
