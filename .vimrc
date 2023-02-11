@@ -7,7 +7,7 @@ filetype off
 
 filetype plugin indent on
 
-colorscheme elflord
+colorscheme default
 
 set tabstop=16
 set softtabstop=4
