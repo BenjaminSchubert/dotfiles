@@ -4,6 +4,8 @@ cleanup = "!git fetch --prune && git branch -vv | awk '/: gone]/{print $1}' | xa
 cl = "clean --exclude .vscode/"
 local-branches = "!git branch --format '%(refname:short) %(upstream:short)' | awk '{if (!$2) print $1;}'"
 info = !"bash -i -c git-info"
+cp = !"git commit -a --fixup HEAD && git push"
+rb = "rebase origin/main --interactive --autosquash"
 
 [color]
 ui = on
