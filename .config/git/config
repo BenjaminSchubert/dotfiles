@@ -12,6 +12,7 @@ ui = on
 
 [push]
 default = simple
+autoSetupRemote = true
 
 [pull]
 ff = only
