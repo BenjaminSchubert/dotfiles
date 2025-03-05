@@ -7,8 +7,24 @@ info = !"bash -i -c git-info"
 cp = !"git commit -a --fixup HEAD && git push"
 rb = "rebase origin/main --interactive --autosquash"
 
+[branch]
+sort = -committerdate
+
 [color]
 ui = on
+
+[diff]
+algorithm = histogram
+colorMoved = plain
+mnemonicPrefix = true
+renames = true
+
+[fetch]
+prune = true
+pruneTags = true
+
+[init]
+defaultBranch = main
 
 [push]
 default = simple
@@ -17,5 +33,5 @@ autoSetupRemote = true
 [pull]
 ff = only
 
-[init]
-defaultBranch = main
+[tag]
+sort = version:refname
