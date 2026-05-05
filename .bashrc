@@ -479,19 +479,3 @@ if [ -f ~/.bashrc.local ]; then
     # shellcheck disable=SC1090
     . ~/.bashrc.local
 fi
-
-
-############
-## Python ##
-############
-
-if [ -f /usr/share/virtualenvwrapper/virtualenvwrapper_lazy.sh ]; then
-    export WORKON_HOME=~/.virtualenvs/
-    # don't follow source when validating with shellcheck
-    # shellcheck disable=SC1091
-    . /usr/share/virtualenvwrapper/virtualenvwrapper_lazy.sh
-else
-    # This is necessary to ensure the return code of the source is not 0
-    # and thus don't show 1 as startup
-    :
-fi
